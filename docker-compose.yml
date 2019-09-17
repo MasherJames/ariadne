@@ -1,0 +1,141 @@
+version: "3.7"
+
+services:
+  gateway:
+    container_name: apollogateway_container
+    build:
+      context: ./apollo_gateway
+      dockerfile: Dockerfile
+    volumes:
+      - "./apollo_gateway:/gateway"
+      - "/gateway/node_modules" # mounts an empty folder for yarn to install dependencies on the image
+    ports:
+      - "4000:4000" # defines port mapping for the gateway
+    networks:
+      - nodeapollonet
+
+  first_service:
+    container_name: accounts_container
+    build:
+      context: ./accounts_service
+      dockerfile: Dockerfile
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./accounts_service:/usr/src/accounts_service/
+    ports:
+      - 8000:8000
+    environment:
+      - DEBUG=1
+      - ENGINE=django.db.backends.postgresql
+      - DB_NAME=ariadne_db
+      - DB_USER=ariadne
+      - PASSWORD=ariadne
+      - SQL_HOST=first_db
+      - PORT=5432
+      - DATABASE=postgres
+    env_file:
+      - ./accounts_service/.env
+    depends_on:
+      - first_db
+      - gateway
+    networks:
+      - nodeapollonet
+
+  first_db:
+    container_name: accounts_db_container
+    image: postgres:10.10
+    volumes:
+      - postgres_data_first:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=ariadne
+      - POSTGRES_PASSWORD=ariadne
+      - POSTGRES_DB=ariadne_db
+    depends_on:
+      - gateway
+    networks:
+      - nodeapollonet
+  second_service:
+    container_name: product_container
+    build:
+      context: ./products_service
+      dockerfile: Dockerfile
+    command: python manage.py runserver 0.0.0.0:8001
+    volumes:
+      - ./products_service:/usr/src/product_service/
+    ports:
+      - 8001:8001
+    environment:
+      - DEBUG=1
+      - ENGINE=django.db.backends.postgresql
+      - DB_NAME=product_service
+      - DB_USER=product_service
+      - PASSWORD=product_service
+      - SQL_HOST=second_db
+      - PORT=5432
+      - DATABASE=postgres
+    depends_on:
+      - second_db
+      - gateway
+    networks:
+      - nodeapollonet
+
+  second_db:
+    container_name: product_db_container
+    image: postgres:10.10
+    volumes:
+      - postgres_data_second:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=product_service
+      - POSTGRES_PASSWORD=product_service
+      - POSTGRES_DB=product_service
+    depends_on:
+      - gateway
+    networks:
+      - nodeapollonet
+
+  third_service:
+    container_name: reviews_container
+    build:
+      context: ./reviews_service
+      dockerfile: Dockerfile
+    command: python manage.py runserver 0.0.0.0:8002
+    volumes:
+      - ./reviews_service:/usr/src/reviews_service/
+    ports:
+      - 8002:8002
+    environment:
+      - DEBUG=1
+      - ENGINE=django.db.backends.postgresql
+      - DB_NAME=reviews
+      - DB_USER=reviews
+      - PASSWORD=reviews
+      - SQL_HOST=third_db
+      - PORT=5432
+      - DATABASE=postgres
+    depends_on:
+      - third_db
+      - gateway
+    networks:
+      - nodeapollonet
+
+  third_db:
+    container_name: reviews_db_container
+    image: postgres:10.10
+    volumes:
+      - postgres_data_third:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=reviews
+      - POSTGRES_PASSWORD=reviews
+      - POSTGRES_DB=reviews
+    depends_on:
+      - gateway
+    networks:
+      - nodeapollonet
+
+volumes:
+  postgres_data_first:
+  postgres_data_second:
+  postgres_data_third:
+
+networks:
+  nodeapollonet:
